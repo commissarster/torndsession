@@ -24,10 +24,9 @@ del l
 
 
 class SessionManager(object):
-
     SESSION_ID = 'msid'
-    DEFAULT_SESSION_LIFETIME = 1200 # seconds
-
+    DEFAULT_SESSION_LIFETIME = 1200  # seconds
+    
     def __init__(self, handler):
         self.handler = handler
         self.settings = {}
@@ -37,8 +36,8 @@ class SessionManager(object):
         self._expires = self._default_session_lifetime
         self._is_dirty = True
         self.__init_session_driver()
-        self.__init_session_object() # initialize session object
-
+        self.__init_session_object()  # initialize session object
+    
     def __init_session_object(self):
         cookiename = self.settings.get('sid_name', self.SESSION_ID)
         session_id = self.handler.get_cookie(cookiename)
@@ -66,19 +65,19 @@ class SessionManager(object):
                 self._expires = expires
         self._expires = self._expires if self._expires else self._default_session_lifetime
         self._id = session_id
-
+    
     def __init_session_driver(self):
         """
         setup session driver.
         """
-
+        
         driver = self.settings.get("driver")
         if not driver:
             raise SessionConfigurationError('driver not found')
         driver_settings = self.settings.get("driver_settings", {})
         if not driver_settings:
             raise SessionConfigurationError('driver settings not found.')
-
+        
         cache_driver = self.settings.get("cache_driver", True)
         if cache_driver:
             cache_name = '__cached_session_driver'
@@ -91,8 +90,8 @@ class SessionManager(object):
             session_driver = getattr(cache_handler, cache_name)
         else:
             session_driver = SessionDriverFactory.create_driver(driver, **driver_settings)
-        self.driver = session_driver(**driver_settings) # create session driver instance.
-
+        self.driver = session_driver(**driver_settings)  # create session driver instance.
+    
     def __init_settings(self):
         """
         Init session relative configurations.
@@ -125,7 +124,7 @@ class SessionManager(object):
 
         """
         session_settings = self.handler.settings.get("session")
-        if not session_settings: # use default
+        if not session_settings:  # use default
             session_settings = {}
             session_settings.update(
                 driver='memory',
@@ -133,7 +132,7 @@ class SessionManager(object):
                 force_persistence=True,
                 cache_driver=True)
         self.settings = session_settings
-
+    
     def _generate_session_id(self, blength=24):
         """generate session id
 
@@ -149,19 +148,27 @@ class SessionManager(object):
             # PY2
             return session_id.translate(_smap)
         return session_id.decode('utf-8').translate(_smap)
-
+    
     def _get_session_object_from_driver(self, session_id):
         """
         Get session data from driver.
         """
         return self.driver.get(session_id)
-
-    def get(self, key, default=None):
+    
+    def get(self, key, default=None, raise_except=False):
         """
         Return session value with name as key.
         """
-        return self.session.get(key, default)
-
+        if raise_except:
+            val = default
+            try:
+                val = self.session[key]
+            except:
+                raise KeyError('%s not found' % key)
+            return val
+        else:
+            return self.session.get(key, default)
+    
     def set(self, key, value):
         """
         Add/Update session value
@@ -172,7 +179,7 @@ class SessionManager(object):
         if force_update:
             self.driver.save(self._id, self.session, self._expires)
             self._is_dirty = False
-
+    
     def delete(self, key):
         """
         Delete session key-value pair
@@ -184,37 +191,40 @@ class SessionManager(object):
         if force_update:
             self.driver.save(self._id, self.session, self._expires)
             self._is_dirty = False
+    
     __delitem__ = delete
-
+    
     def iterkeys(self):
         return iter(self.session)
+    
     __iter__ = iterkeys
-
+    
     def keys(self):
         """
         Return all keys in session object
         """
         return self.session.keys()
-
+    
     def flush(self):
         """
         this method force system to do  session data persistence.
         """
         if self._is_dirty:
             self.driver.save(self._id, self.session, self._expires)
-
+    
     def __setitem__(self, key, value):
         self.set(key, value)
-
+    
     def __getitem__(self, key):
         val = self.get(key)
-        if val:
-            return val
-        raise KeyError('%s not found' % key)
-
+        return val
+        # if val:
+        #     return val
+        # raise KeyError('%s not found' % key)
+    
     def __contains__(self, key):
         return key in self.session
-
+    
     @property
     def id(self):
         """
@@ -223,7 +233,7 @@ class SessionManager(object):
         if not hasattr(self, '_id'):
             self.__init_session_object()
         return self._id
-
+    
     @property
     def expires(self):
         """
@@ -233,7 +243,7 @@ class SessionManager(object):
         if not hasattr(self, '_expires'):
             self.__init_session_object()
         return self._expires
-
+    
     def __session_settings(self):
         session_settings = self.settings.get('cookie_config', {})
         session_settings.setdefault('expires', None)
@@ -242,11 +252,10 @@ class SessionManager(object):
 
 
 class SessionMixin(object):
-
     @property
     def session(self):
         return self._create_mixin(self, '__session_manager', SessionManager)
-
+    
     def _create_mixin(self, context, inner_property_name, session_handler):
         if not hasattr(context, inner_property_name):
             setattr(context, inner_property_name, session_handler(context))
